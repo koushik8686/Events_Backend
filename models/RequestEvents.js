@@ -53,17 +53,9 @@ const eventSchema = new mongoose.Schema({
     type: String, // Contact details for the event coordinator
     required: true,
   },
-  participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  remarks:[String],
-  ratings:[{
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    name:String,
-    rating: { type: Number, min: 1, max: 5 },
-    comment: String,
-    createdAt: { type: Date, default: Date.now } 
-  }]
+  remarks:[String]
 }, { timestamps: true });
 
-const Event = mongoose.model('Events', eventSchema);
+const RequestedEvents = mongoose.model('RequestedEvents', eventSchema);
 
-module.exports = Event;
+module.exports = RequestedEvents;

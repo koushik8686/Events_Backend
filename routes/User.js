@@ -23,4 +23,151 @@ router.put('/profile/:id', function (req, res) {
     })
 })
 
+router.post('/register-event/:id', async (req, res) => {
+    try {
+      const { userid } = req.body; // Extract userid from the request body
+      const eventId = req.params.id; // Extract event ID from URL params
+  
+      if (!userid || !eventId) {
+        return res.status(400).json({ error: 'Missing userid or event ID' });
+      }
+  
+      // Update the user's registered events
+      const updatedUser = await User.findByIdAndUpdate(
+        userid,
+        { $push: { events: eventId } }, // Add the event ID to the user's `events` array
+        { new: true } // Return the updated user document
+      );
+  
+      if (!updatedUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+  
+      // Update the event's registered users
+      const updatedEvent = await Event.findByIdAndUpdate(
+        eventId,
+        { $push: { participants: userid } }, // Add the user ID to the event's `participants` array
+        { new: true } // Return the updated event document
+      );
+  
+      if (!updatedEvent) {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+  
+      res.status(200).json({
+        message: 'User registered for the event successfully',
+        user: updatedUser,
+        event: updatedEvent,
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Internal Server Error', details: error.message });
+    }
+  });
+
+router.post('/unregister-event/:id', async (req, res) => {
+    try {
+      const { userid } = req.body;
+      const eventId = req.params.id;
+  
+      if (!userid || !eventId) {
+        return res.status(400).json({ error: 'Missing userid or event ID' });
+      }
+  
+      const updatedUser = await User.findByIdAndUpdate(
+        userid,
+        { $pull: { events: eventId } },
+        { new: true }
+      );
+  
+      if (!updatedUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+  
+      const updatedEvent = await Event.findByIdAndUpdate(
+        eventId,
+        { $pull: { participants: userid } },
+        { new: true }
+      );
+  
+      if (!updatedEvent) {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+  
+      res.status(200).json({
+        message: 'User unregistered from the event successfully',
+        user: updatedUser,
+        event: updatedEvent,
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Internal Server Error', details: error.message });
+    }
+  });
+
+  router.post('/add-comment/:id', async (req, res) => {
+    const { user, name, rating, comment } = req.body;
+    const { id } = req.params;
+  
+    if (!user || !name || !rating || !comment) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+  
+    if (rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    }
+  
+    try {
+      const item = await Model.findById(id);
+  
+      if (!item) {
+        return res.status(404).json({ error: 'Item not found' });
+      }
+  
+      const newComment = {
+        user,
+        name,
+        rating,
+        comment,
+        createdAt: new Date(),
+      };
+  
+      item.ratings.push(newComment);
+      await item.save();
+  
+      res.status(201).json({ message: 'Comment added successfully', ratings: item.ratings });
+    } catch (error) {
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });  
+  router.delete('/delete-comment/:id/:commentId', async (req, res) => {
+    const { id, commentId } = req.params;
+    const { userId } = req.body; // Assuming the user ID of the request sender is sent in the request body
+  
+    try {
+      const item = await Model.findById(id);
+  
+      if (!item) {
+        return res.status(404).json({ error: 'Item not found' });
+      }
+  
+      const commentIndex = item.ratings.findIndex(rating => rating._id.toString() === commentId);
+  
+      if (commentIndex === -1) {
+        return res.status(404).json({ error: 'Comment not found' });
+      }
+  
+      const comment = item.ratings[commentIndex];
+  
+      if (comment.user.toString() !== userId) {
+        return res.status(403).json({ error: 'You are not authorized to delete this comment' });
+      }
+  
+      item.ratings.splice(commentIndex, 1);
+      await item.save();
+  
+      res.status(200).json({ message: 'Comment deleted successfully', ratings: item.ratings });
+    } catch (error) {
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+  
 module.exports = router
