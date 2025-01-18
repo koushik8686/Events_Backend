@@ -1,12 +1,26 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
 
-const eventSchema = new mongoose.Schema({
- name:String,
- email:String,
- profile:String,
- events: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Event' }],
+const userSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    events: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Event' }]
 }, { timestamps: true });
 
-const Event = mongoose.model('Users', eventSchema);
+// Hash password before saving
+userSchema.pre('save', async function (next) {
+    if (!this.isModified('password')) return next();
+    try {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
+        next();
+    } catch (err) {
+        next(err);
+    }
+});
 
-module.exports = Event;
+const User = mongoose.model('User', userSchema);
+
+module.exports = User;
