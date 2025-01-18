@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const Events = require("../models/event")
-const Requests = require("../models/RequestEvents")
 const nodemailer = require('nodemailer');
 const defaultEmail = 'admin@example.com';
 const defaultPassword = 'password123';
@@ -32,7 +31,7 @@ router.get("/admin/events", function (req , res) {
 });
 
 router.get("/admin/requests", function (req , res) { 
-  Requests.find({}).then(requestEvents => {
+  Event.find({ status: 'pending' }).then(requestEvents => {
     res.json(requestEvents);
   }).catch(err => {
     console.error(err);
@@ -43,16 +42,18 @@ router.get("/admin/requests", function (req , res) {
 router.post("/admin/accept-event/:id", async (req, res) => {
   const eventId = req.params.id;
   try {
-    const event = await Requests.findById(eventId);
+    const event = await Event.findById(eventId);
+    
     if (!event) {
       return res.status(404).json({ error: 'Event not found' });
     }
-    const newEvent = new Events(event);
-    await newEvent.save();
-    await event.remove();
+
+    event.status = 'approved';
+    await event.save();
+
     const mailOptions = {
       from: 'yourEmail@example.com',
-      to: event.club.email,
+      to: event.clubs[0].email,
       subject: 'Event Accepted',
       text: 'Your event has been accepted and is now live on our platform.'
     };
@@ -64,13 +65,12 @@ router.post("/admin/accept-event/:id", async (req, res) => {
       console.log('Email sent: ' + info.response);
     });
 
-    res.status(200).json({ message: 'Event accepted successfully' });
+    res.status(200).json({ message: 'Event accepted and status updated to approved successfully' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
-
 router.delete("/admin/delete-event/:id", async (req, res) => {
   const eventId = req.params.id;
   try {
@@ -104,7 +104,7 @@ router.delete("/admin/delete-event/:id", async (req, res) => {
 router.delete("/admin/delete-request/:id", async (req, res) => {
   const requestId = req.params.id;
   try {
-    const request = await Requests.findById(requestId);
+    const request = await Events.findById(requestId);
     if (!request) {
       return res.status(404).json({ error: 'Request not found' });
     }
@@ -134,7 +134,7 @@ router.post("/admin/add-remark/:id", async (req, res) => {
   const id = req.params.id;
   const { remark } = req.body;
   try {
-    const request = await Requests.findById(id);
+    const request = await Eventss.findById(id);
     if (!request) {
       return res.status(404).json({ error: 'Request not found' });
     }
@@ -163,3 +163,5 @@ router.post("/admin/add-remark-to-event/:id", async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
+module.exports = router;

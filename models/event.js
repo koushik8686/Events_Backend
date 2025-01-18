@@ -5,10 +5,12 @@ const eventSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  event_type:String,
   description: {
     type: String,
     required: true,
   },
+  clubs:[{ type: mongoose.Schema.Types.ObjectId, ref: 'Clubs' }],
   imageUrl: {
     type: String,
     required: true,
@@ -46,18 +48,29 @@ const eventSchema = new mongoose.Schema({
     default: 0,
   },
   category: {
-    type: String, // For example: 'Sports', 'Cultural', 'Technical'
+    type: String, 
     default: 'General',
   },
   contactInfo: {
-    type: String, // Contact details for the event coordinator
+    type: String, 
     required: true,
   },
+  status:{type: String, default: 'pending'},
   participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   remarks:[String],
+  prices:[String],
+  about:String,
+  timeline:[{
+    time:String,
+    speaker:String,
+    topic:String,
+    description:String,
+    createdAt: { type: Date, default: Date.now }  
+  }],
   ratings:[{
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     name:String,
+    profile:String,
     rating: { type: Number, min: 1, max: 5 },
     comment: String,
     createdAt: { type: Date, default: Date.now } 

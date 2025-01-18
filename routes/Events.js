@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Events = require("../models/event");
 const cloudinary = require('cloudinary').v2;
-const RequestedEvents = require('../models/RequestEvents');
 const nodemailer = require('nodemailer');
+const Clubs = require('../models/Club');
 
 const adminmail = "pinnukoushikp@gmail.com";
 
@@ -25,7 +25,23 @@ const transporter = nodemailer.createTransport({
 router.get('/events', async (req, res) => {
   try {
     const allEvents = await Events.find();
-    res.status(200).json(allEvents);
+    const updatedEvents = await Promise.all(
+      allEvents.map(async (event) => {
+        const clubsdata = await Promise.all(
+          event.clubs.map(async (clubId) => {
+            const clubdata = await Clubs.findById(clubId);
+            return {
+              name: clubdata.name,
+              email: clubdata.email,
+              logo: clubdata.logo_url,
+            };
+          })
+        );
+        event.clubsData = clubsdata; // Append the club data to each event
+        return event;
+      })
+    );
+    res.status(200).json(updatedEvents);
   } catch (error) {
     res.status(500).json({ error: 'Internal Server Error' });
   }
@@ -48,7 +64,7 @@ router.post('/events', async (req, res) => {
     });
 
     // Save requested event to the database
-    const newEvent = new RequestedEvents({
+    const newEvent = new Event({
       title,
       description,
       imageUrl: uploadedImage.secure_url,

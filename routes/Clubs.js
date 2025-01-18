@@ -3,7 +3,11 @@ const router = express.Router();
 const Clubs = require("../models/Club");
 const cloudinary = require('cloudinary').v2;
 const bcrypt = require('bcrypt');
-const Requests = require("../models/RequestEvents");
+
+const {storage} = require('../storage/storage')
+// Set up Cloudinary configuration using environment variablesconst { storage } = require('./storage/storage');
+const multer = require('multer');
+const upload = multer({ storage });
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME,
   api_key: process.env.API_KEY,
@@ -19,24 +23,28 @@ router.get('/clubs', async (req, res) => {
   }
 });
 
-router.post('/clubs', async (req, res) => {
-  try {
-    const { name, email, password, banner } = req.body;
 
-    if (!name || !email || !password || !banner) {
+
+router.post('/clubs', upload.fields([{ name: 'banner' }, { name: 'logo' }]), async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password || !req.files.banner || !req.files.logo) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const uploadedBanner = await cloudinary.uploader.upload(banner, {
-      folder: 'club_banners',
-    });
+
+    // Access the uploaded file URLs
+    const bannerUrl = req.files.banner[0].path; // Cloudinary URL for banner
+    const logoUrl = req.files.logo[0].path;     // Cloudinary URL for logo
 
     const newClub = new Clubs({
       name,
       email,
       password: hashedPassword,
-      banner_url: uploadedBanner.secure_url,
+      banner_url: bannerUrl,
+      logo_url: logoUrl,
       events: [],
     });
 
@@ -49,13 +57,16 @@ router.post('/clubs', async (req, res) => {
         name: newClub.name,
         email: newClub.email,
         banner_url: newClub.banner_url,
+        logo_url: newClub.logo_url,
         events: newClub.events,
       },
     });
   } catch (error) {
+    console.error('Error creating club:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
 router.post('/clubs/login', async (req, res) => {
   try {
     const { email, password } = req.body;

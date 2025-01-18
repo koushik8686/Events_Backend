@@ -4,23 +4,16 @@ const dotenv = require('dotenv');
 const Event = require('./models/event'); // Import Event model
 const express = require('express');
 const cors = require('cors');
-dotenv.config(); // Load environment variables from .env file
-
+dotenv.config(); 
 const app = express();
 const port = 5000;
 var bodyParser = require('body-parser');
-app.use(bodyParser.json({limit: '50mb'}));
-app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
 app.use(cors());
-app.use(express.urlencoded({ limit: '500mb', extended: true }));
-
-// Set up Cloudinary configuration using environment variables
-cloudinary.config({
-  cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.API_KEY,
-  api_secret: process.env.API_SECRET,
-});
-
+app.use(bodyParser.urlencoded({ limit: '500mb', extended: true }));
+const {storage} = require('./storage/storage')
+// Set up Cloudinary configuration using environment variablesconst { storage } = require('./storage/storage');
+const multer = require('multer');
+const upload = multer({ storage });
 // Connect to MongoDB
 mongoose.connect(process.env.URL)
   .then(() => console.log("Connected to MongoDB"))
@@ -31,22 +24,20 @@ app.get('/', (req, res) => {
 });
 
 // Create event with image upload to Cloudinary
-app.post('/create', async (req, res) => {
+router.post('/create', upload.single('image'), async (req, res) => {
   try {
-    const { title, description, image } = req.body;
+    const { title, description } = req.body;
 
-    if (!image) {
+    // Multer adds the file path automatically after successful upload
+    if (!req.file) {
       return res.status(400).send("No image provided");
     }
-    const uploadedImage = await cloudinary.uploader.upload(image, {
-      folder: "event_images", // Optional: specify a folder for image organization
-    });
 
     // Create event document
     const newEvent = new Event({
       title,
       description,
-      imageUrl: uploadedImage.secure_url, // Store Cloudinary image URL
+      imageUrl: req.file.path, // Cloudinary URL from Multer's response
     });
 
     // Save the event to MongoDB
@@ -55,13 +46,13 @@ app.post('/create', async (req, res) => {
     res.json({
       message: 'Event Created Successfully',
       event: {
-        title,
-        description,
-        imageUrl: uploadedImage.secure_url, // Image URL from Cloudinary
+        title: newEvent.title,
+        description: newEvent.description,
+        imageUrl: newEvent.imageUrl,
       },
     });
   } catch (error) {
-    console.error('Error uploading image:', error);
+    console.error('Error creating event:', error);
     res.status(500).send('Internal Server Error');
   }
 });
@@ -72,4 +63,8 @@ app.listen(port, () => {
 
 
 app.use('/auth/google' , require('./routes/GoogleAuth'))
+
 app.use( '/', require("./routes/User"))
+app.use( '/', require("./routes/Events"))
+app.use("/" , require("./routes/Admin"))
+app.use("/" , require("./routes/Clubs"))
