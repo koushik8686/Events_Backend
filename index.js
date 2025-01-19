@@ -24,38 +24,7 @@ app.get('/', (req, res) => {
 });
 
 // Create event with image upload to Cloudinary
-router.post('/create', upload.single('image'), async (req, res) => {
-  try {
-    const { title, description } = req.body;
 
-    // Multer adds the file path automatically after successful upload
-    if (!req.file) {
-      return res.status(400).send("No image provided");
-    }
-
-    // Create event document
-    const newEvent = new Event({
-      title,
-      description,
-      imageUrl: req.file.path, // Cloudinary URL from Multer's response
-    });
-
-    // Save the event to MongoDB
-    await newEvent.save();
-
-    res.json({
-      message: 'Event Created Successfully',
-      event: {
-        title: newEvent.title,
-        description: newEvent.description,
-        imageUrl: newEvent.imageUrl,
-      },
-    });
-  } catch (error) {
-    console.error('Error creating event:', error);
-    res.status(500).send('Internal Server Error');
-  }
-});
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
