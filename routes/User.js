@@ -6,7 +6,7 @@ const user = require("../models/User");
 router.get("/profile/:id", async function (req, res) {
   try {
     const { id } = req.params;
-    const profile = await user.findById(new mongoose.Types.ObjectId(id));
+    const profile = await user.findById(id);
     if (!profile) {
       return res.status(404).send({ error: "Profile not found" });
     }
