@@ -17,6 +17,20 @@ router.get("/profile/:id", async function (req, res) {
   }
 });
 
+router.get("/profile/google/:id", async function (req, res) {
+  try {
+    const { id } = req.params;
+    const profile = await user.findOne({ googleId: id });
+    if (!profile) {
+      return res.status(404).send({ error: "Profile not found" });
+    }
+    res.status(200).send(profile);
+  } catch (error) {
+    console.error("Error fetching profile:", error);
+    res.status(500).send({ error: "Internal Server Error" });
+  }
+});
+
 router.put("/profile/:id", function (req, res) {
   user
     .findByIdAndUpdate(req.params.id, req.body, { new: true })
