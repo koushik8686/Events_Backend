@@ -87,10 +87,10 @@ router.post("/register-event", async (req, res) => {
   }
 });
 
-router.post("/unregister-event/:id", async (req, res) => {
+router.post("/unregister-event", async (req, res) => {
   try {
-    const { userid } = req.body;
-    const eventId = req.params.id;
+    const userid = req.body?.userid;
+    const eventId = req.body?.eventId;
 
     if (!userid || !eventId) {
       return res.status(400).json({ error: "Missing userid or event ID" });

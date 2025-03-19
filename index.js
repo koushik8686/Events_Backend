@@ -10,7 +10,8 @@ const port = 5000;
 var bodyParser = require("body-parser");
 
 app.use(express.json());
-app.use(cors());
+// app.use(cors());
+app.use(cors({ origin: "http://localhost:5173" }));
 app.use(bodyParser.urlencoded({ limit: "500mb", extended: true }));
 
 const { storage } = require("./storage/storage");
