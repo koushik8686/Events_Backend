@@ -1,7 +1,8 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const router = express.Router();
-const user = require("../models/User");
+const User = require("../models/User");
+const Event = require("../models/event");
 
 router.get("/profile/:id", async function (req, res) {
   try {
@@ -40,10 +41,10 @@ router.put("/profile/:id", function (req, res) {
     });
 });
 
-router.post("/register-event/:id", async (req, res) => {
+router.post("/register-event", async (req, res) => {
   try {
-    const { userid } = req.body; // Extract userid from the request body
-    const eventId = req.params.id; // Extract event ID from URL params
+    const userid = req.body?.userid;
+    const eventId = req.body?.eventId;
 
     if (!userid || !eventId) {
       return res.status(400).json({ error: "Missing userid or event ID" });
@@ -70,6 +71,9 @@ router.post("/register-event/:id", async (req, res) => {
     if (!updatedEvent) {
       return res.status(404).json({ error: "Event not found" });
     }
+
+    console.log("Received userId:", userid);
+    console.log("Received eventId:", eventId);
 
     res.status(200).json({
       message: "User registered for the event successfully",
