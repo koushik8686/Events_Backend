@@ -1,9 +1,9 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 const Events = require("../models/event");
-const cloudinary = require('cloudinary').v2;
-const nodemailer = require('nodemailer');
-const Clubs = require('../models/Club');
+const cloudinary = require("cloudinary").v2;
+const nodemailer = require("nodemailer");
+const Clubs = require("../models/Club");
 
 const adminmail = "pinnukoushikp@gmail.com";
 
@@ -15,52 +15,111 @@ cloudinary.config({
 
 // Configure Nodemailer
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  service: "gmail",
   auth: {
-      user: process.env.EMAIL,
-      pass: process.env.EMAIL_PASSWORD
-  }
+    user: process.env.EMAIL,
+    pass: process.env.EMAIL_PASSWORD,
+  },
 });
 
-router.get('/events', async (req, res) => {
+router.get("/events", async (req, res) => {
   try {
+    // Ensure Events model is correctly imported
     const allEvents = await Events.find();
+
+    // Add logging to diagnose the issue
+    console.log("Fetched events:", allEvents);
+
+    // Modify the route to handle potential errors more explicitly
+    if (!allEvents || allEvents.length === 0) {
+      return res.status(404).json({ message: "No events found" });
+    }
+
     const updatedEvents = await Promise.all(
       allEvents.map(async (event) => {
-        const clubsdata = await Promise.all(
-          event.clubs.map(async (clubId) => {
-            const clubdata = await Clubs.findById(clubId);
-            return {
-              name: clubdata.name,
-              email: clubdata.email,
-              logo: clubdata.logo_url,
-            };
-          })
-        );
-        event.clubsData = clubsdata; // Append the club data to each event
-        return event;
+        try {
+          // Add null checks
+          if (!event.clubs || event.clubs.length === 0) {
+            return { ...event.toObject(), clubsData: [] };
+          }
+
+          const clubsdata = await Promise.all(
+            event.clubs.map(async (clubId) => {
+              try {
+                const clubdata = await Clubs.findById(clubId);
+                return clubdata
+                  ? {
+                      name: clubdata.name,
+                      email: clubdata.email,
+                      logo: clubdata.logo_url,
+                    }
+                  : null;
+              } catch (clubError) {
+                console.error(`Error fetching club ${clubId}:`, clubError);
+                return null;
+              }
+            })
+          );
+
+          // Filter out null clubs
+          const filteredClubsData = clubsdata.filter((club) => club !== null);
+
+          return {
+            ...event.toObject(),
+            clubsData: filteredClubsData,
+          };
+        } catch (eventError) {
+          console.error(`Error processing event ${event._id}:`, eventError);
+          return event.toObject();
+        }
       })
     );
+
     res.status(200).json(updatedEvents);
   } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
+    // Improved error logging
+    console.error("Complete error details:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      details: error.message,
+    });
   }
 });
 
-router.post('/events', async (req, res) => {
+router.post("/events", async (req, res) => {
   try {
     const {
-      title, description, image, date, time, venue,
-      isTeamEvent, teamSize, prizeMoney, isPaid, amount, category, contactInfo,
+      title,
+      description,
+      image,
+      date,
+      time,
+      venue,
+      isTeamEvent,
+      teamSize,
+      prizeMoney,
+      isPaid,
+      amount,
+      category,
+      contactInfo,
     } = req.body;
 
-    if (!title || !description || !image || !date || !time || !venue || isTeamEvent === undefined || !contactInfo) {
-      return res.status(400).json({ error: 'Required fields are missing' });
+    if (
+      !title ||
+      !description ||
+      !image ||
+      !date ||
+      !time ||
+      !venue ||
+      isTeamEvent === undefined ||
+      !contactInfo
+    ) {
+      return res.status(400).json({ error: "Required fields are missing" });
     }
 
     // Upload image to Cloudinary
     const uploadedImage = await cloudinary.uploader.upload(image, {
-      folder: 'event_images',
+      folder: "event_images",
     });
 
     // Save requested event to the database
@@ -76,7 +135,7 @@ router.post('/events', async (req, res) => {
       prizeMoney: prizeMoney || 0,
       isPaid: isPaid || false,
       amount: isPaid ? amount : 0,
-      category: category || 'General',
+      category: category || "General",
       contactInfo,
     });
 
@@ -86,7 +145,7 @@ router.post('/events', async (req, res) => {
     const mailOptions = {
       from: process.env.EMAIL,
       to: adminmail,
-      subject: 'New Event Request Submitted',
+      subject: "New Event Request Submitted",
       html: `
         <h3>New Event Request Details</h3>
         <p><b>Title:</b> ${title}</p>
@@ -102,7 +161,7 @@ router.post('/events', async (req, res) => {
     await transporter.sendMail(mailOptions);
 
     res.status(201).json({
-      message: 'Event Created Successfully and Email Sent to Admin',
+      message: "Event Created Successfully and Email Sent to Admin",
       event: {
         id: newEvent._id,
         title: newEvent.title,
@@ -121,30 +180,43 @@ router.post('/events', async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-
-router.get('/events/:id', async (req, res) => {
+router.get("/events/:id", async (req, res) => {
   try {
     const event = await Events.findById(req.params.id);
     if (!event) {
-      return res.status(404).json({ error: 'Event not found' });
+      return res.status(404).json({ error: "Event not found" });
     }
     res.status(200).json(event);
   } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-router.put('/events/:id', async (req, res) => {
+router.put("/events/:id", async (req, res) => {
   try {
-    const { title, description, image, date, time, venue, isTeamEvent, teamSize, prizeMoney, isPaid, amount, category, contactInfo } = req.body;
+    const {
+      title,
+      description,
+      image,
+      date,
+      time,
+      venue,
+      isTeamEvent,
+      teamSize,
+      prizeMoney,
+      isPaid,
+      amount,
+      category,
+      contactInfo,
+    } = req.body;
     const event = await Events.findById(req.params.id);
 
     if (!event) {
-      return res.status(404).json({ error: 'Event not found' });
+      return res.status(404).json({ error: "Event not found" });
     }
 
     if (title) {
@@ -155,7 +227,7 @@ router.put('/events/:id', async (req, res) => {
     }
     if (image) {
       const uploadedImage = await cloudinary.uploader.upload(image, {
-        folder: 'event_images',
+        folder: "event_images",
       });
       event.imageUrl = uploadedImage.secure_url;
     }
@@ -189,7 +261,7 @@ router.put('/events/:id', async (req, res) => {
     await event.save();
 
     res.status(200).json({
-      message: 'Event Updated Successfully',
+      message: "Event Updated Successfully",
       event: {
         id: event._id,
         title: event.title,
@@ -208,7 +280,7 @@ router.put('/events/:id', async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
