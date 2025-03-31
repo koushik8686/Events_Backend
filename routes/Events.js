@@ -5,8 +5,6 @@ const cloudinary = require('cloudinary').v2;
 const nodemailer = require('nodemailer');
 const Clubs = require('../models/Club');
 
-const adminmail = "pinnukoushikp@gmail.com";
-
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME,
   api_key: process.env.API_KEY,
@@ -25,107 +23,99 @@ const transporter = nodemailer.createTransport({
 router.get('/events', async (req, res) => {
   try {
     const allEvents = await Events.find();
-    const updatedEvents = await Promise.all(
-      allEvents.map(async (event) => {
-        const clubsdata = await Promise.all(
-          event.clubs.map(async (clubId) => {
-            const clubdata = await Clubs.findById(clubId);
-            return {
-              name: clubdata.name,
-              email: clubdata.email,
-              logo: clubdata.logo_url,
-            };
-          })
-        );
-        event.clubsData = clubsdata; // Append the club data to each event
-        return event;
-      })
-    );
-    res.status(200).json(updatedEvents);
+    res.status(200).json(allEvents);
   } catch (error) {
+    console.error('Error fetching events:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
 router.post('/events', async (req, res) => {
   try {
+    console.log("Received event data:", JSON.stringify(req.body, null, 2));
+    
+    // Extract all fields from the request body
     const {
       title, description, image, date, time, venue,
-      isTeamEvent, teamSize, prizeMoney, isPaid, amount, category, contactInfo,
+      isTeamEvent, teamSize, prizeMoney, isPaid, amount, event_type, contactInfo,
     } = req.body;
 
+    // Log what fields we received to debug
+    console.log('Received fields:', {
+      title: !!title,
+      description: !!description, 
+      image: !!image,
+      date: !!date,
+      time: !!time,
+      venue: !!venue,
+      isTeamEvent: isTeamEvent,
+      teamSize: teamSize,
+      prizeMoney: prizeMoney,
+      isPaid: isPaid,
+      amount: amount,
+      event_type: event_type,
+      contactInfo: !!contactInfo
+    });
+
+    // Validate required fields
     if (!title || !description || !image || !date || !time || !venue || isTeamEvent === undefined || !contactInfo) {
-      return res.status(400).json({ error: 'Required fields are missing' });
+      console.log("Missing required fields");
+      return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Upload image to Cloudinary
-    const uploadedImage = await cloudinary.uploader.upload(image, {
-      folder: 'event_images',
-    });
+    try {
+      // Upload image to Cloudinary
+      console.log("Uploading image to Cloudinary...");
+      const uploadResponse = await cloudinary.uploader.upload(image, {
+        folder: 'event_images',
+      });
+      
+      console.log("Image uploaded successfully:", uploadResponse.secure_url);
 
-    // Save requested event to the database
-    const newEvent = new Event({
-      title,
-      description,
-      imageUrl: uploadedImage.secure_url,
-      date,
-      time,
-      venue,
-      isTeamEvent,
-      teamSize: isTeamEvent ? teamSize : 1,
-      prizeMoney: prizeMoney || 0,
-      isPaid: isPaid || false,
-      amount: isPaid ? amount : 0,
-      category: category || 'General',
-      contactInfo,
-    });
+      // Create event document with proper field mapping
+      const eventDocument = {
+        title: title,
+        description: description,
+        imageUrl: uploadResponse.secure_url, // Note: schema field is imageUrl, not image
+        date: new Date(date), // Convert string date to Date object
+        time: time,
+        venue: venue,
+        isTeamEvent: Boolean(isTeamEvent), // Ensure boolean
+        teamSize: teamSize ? Number(teamSize) : 1, // Ensure number
+        prizeMoney: prizeMoney ? Number(prizeMoney) : 0, // Ensure number
+        isPaid: Boolean(isPaid), // Ensure boolean
+        amount: amount ? Number(amount) : 0, // Ensure number
+        event_type: event_type, 
+        contactInfo: contactInfo,
+        // Default values handled by schema
+      };
 
-    await newEvent.save();
-
-    // Send email notification to the admin
-    const mailOptions = {
-      from: process.env.EMAIL,
-      to: adminmail,
-      subject: 'New Event Request Submitted',
-      html: `
-        <h3>New Event Request Details</h3>
-        <p><b>Title:</b> ${title}</p>
-        <p><b>Description:</b> ${description}</p>
-        <p><b>Date:</b> ${date}</p>
-        <p><b>Time:</b> ${time}</p>
-        <p><b>Venue:</b> ${venue}</p>
-        <p><b>Contact Info:</b> ${contactInfo}</p>
-        <p><b>Image:</b> <a href="${uploadedImage.secure_url}">View Image</a></p>
-      `,
-    };
-
-    await transporter.sendMail(mailOptions);
-
-    res.status(201).json({
-      message: 'Event Created Successfully and Email Sent to Admin',
-      event: {
-        id: newEvent._id,
-        title: newEvent.title,
-        description: newEvent.description,
-        imageUrl: newEvent.imageUrl,
-        date: newEvent.date,
-        time: newEvent.time,
-        venue: newEvent.venue,
-        isTeamEvent: newEvent.isTeamEvent,
-        teamSize: newEvent.teamSize,
-        prizeMoney: newEvent.prizeMoney,
-        isPaid: newEvent.isPaid,
-        amount: newEvent.amount,
-        category: newEvent.category,
-        contactInfo: newEvent.contactInfo,
-      },
-    });
+      console.log("Creating new event with data:", eventDocument);
+      
+      const newEvent = new Events(eventDocument);
+      const savedEvent = await newEvent.save();
+      
+      console.log("Event saved successfully with ID:", savedEvent._id);
+      
+      res.status(201).json({ 
+        message: 'Event created successfully', 
+        event: savedEvent 
+      });
+    } catch (uploadError) {
+      console.error('Error during image upload or event creation:', uploadError);
+      res.status(500).json({ 
+        error: 'Error processing image or saving event: ' + uploadError.message 
+      });
+    }
   } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Error creating event:', error);
+    res.status(500).json({ 
+      error: 'Failed to create event. Please try again.' 
+    });
   }
 });
 
-
+// Keep your other routes unchanged
 router.get('/events/:id', async (req, res) => {
   try {
     const event = await Events.findById(req.params.id);
@@ -138,75 +128,25 @@ router.get('/events/:id', async (req, res) => {
   }
 });
 
-router.put('/events/:id', async (req, res) => {
+router.post('/events/:id/accept', async (req, res) => {
   try {
-    const { title, description, image, date, time, venue, isTeamEvent, teamSize, prizeMoney, isPaid, amount, category, contactInfo } = req.body;
     const event = await Events.findById(req.params.id);
-
     if (!event) {
       return res.status(404).json({ error: 'Event not found' });
     }
-
-    if (title) {
-      event.title = title;
-    }
-    if (description) {
-      event.description = description;
-    }
-    if (image) {
-      const uploadedImage = await cloudinary.uploader.upload(image, {
-        folder: 'event_images',
-      });
-      event.imageUrl = uploadedImage.secure_url;
-    }
-    if (date) {
-      event.date = date;
-    }
-    if (time) {
-      event.time = time;
-    }
-    if (venue) {
-      event.venue = venue;
-    }
-    if (isTeamEvent !== undefined) {
-      event.isTeamEvent = isTeamEvent;
-      event.teamSize = isTeamEvent ? teamSize : 1;
-    }
-    if (prizeMoney) {
-      event.prizeMoney = prizeMoney;
-    }
-    if (isPaid) {
-      event.isPaid = isPaid;
-      event.amount = isPaid ? amount : 0;
-    }
-    if (category) {
-      event.category = category;
-    }
-    if (contactInfo) {
-      event.contactInfo = contactInfo;
-    }
-
+    event.status = 'accepted';
     await event.save();
+    res.status(200).json(event);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+})  
 
-    res.status(200).json({
-      message: 'Event Updated Successfully',
-      event: {
-        id: event._id,
-        title: event.title,
-        description: event.description,
-        imageUrl: event.imageUrl,
-        date: event.date,
-        time: event.time,
-        venue: event.venue,
-        isTeamEvent: event.isTeamEvent,
-        teamSize: event.teamSize,
-        prizeMoney: event.prizeMoney,
-        isPaid: event.isPaid,
-        amount: event.amount,
-        category: event.category,
-        contactInfo: event.contactInfo,
-      },
-    });
+router.put('/events/:id', async (req, res) => {
+  try {
+    const updatedEvent = await Events.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.status(200).json(updatedEvent);
   } catch (error) {
     res.status(500).json({ error: 'Internal Server Error' });
   }

@@ -7,9 +7,9 @@ const cors = require('cors');
 dotenv.config(); 
 const app = express();
 const port = 5000;
-var bodyParser = require('body-parser');
 app.use(cors());
-app.use(bodyParser.urlencoded({ limit: '500mb', extended: true }));
+app.use(express.json({ limit: '50mb' })); // Increased limit for JSON data
+app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Increased limit for form data
 const {storage} = require('./storage/storage')
 // Set up Cloudinary configuration using environment variablesconst { storage } = require('./storage/storage');
 const multer = require('multer');
@@ -21,6 +21,13 @@ mongoose.connect(process.env.URL)
 
 app.get('/', (req, res) => {
   res.send('Hello');
+});
+
+
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  console.log('Content-Type:', req.headers['content-type']);
+  next();
 });
 
 // Create event with image upload to Cloudinary
