@@ -1,4 +1,4 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 const Events = require("../models/event");
 const cloudinary = require('cloudinary').v2;
@@ -13,15 +13,16 @@ cloudinary.config({
 
 // Configure Nodemailer
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  service: "gmail",
   auth: {
-      user: process.env.EMAIL,
-      pass: process.env.EMAIL_PASSWORD
-  }
+    user: process.env.EMAIL,
+    pass: process.env.EMAIL_PASSWORD,
+  },
 });
 
-router.get('/events', async (req, res) => {
+router.get("/events", async (req, res) => {
   try {
+    // Ensure Events model is correctly imported
     const allEvents = await Events.find();
     res.status(200).json(allEvents);
   } catch (error) {
@@ -30,7 +31,7 @@ router.get('/events', async (req, res) => {
   }
 });
 
-router.post('/events', async (req, res) => {
+router.post("/events", async (req, res) => {
   try {
     console.log("Received event data:", JSON.stringify(req.body, null, 2));
     
@@ -120,11 +121,11 @@ router.get('/events/:id', async (req, res) => {
   try {
     const event = await Events.findById(req.params.id);
     if (!event) {
-      return res.status(404).json({ error: 'Event not found' });
+      return res.status(404).json({ error: "Event not found" });
     }
     res.status(200).json(event);
   } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -132,7 +133,7 @@ router.post('/events/:id/accept', async (req, res) => {
   try {
     const event = await Events.findById(req.params.id);
     if (!event) {
-      return res.status(404).json({ error: 'Event not found' });
+      return res.status(404).json({ error: "Event not found" });
     }
     event.status = 'accepted';
     await event.save();
@@ -148,7 +149,7 @@ router.put('/events/:id', async (req, res) => {
     const updatedEvent = await Events.findByIdAndUpdate(req.params.id, req.body, { new: true });
     res.status(200).json(updatedEvent);
   } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
